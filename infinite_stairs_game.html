@@ -1,0 +1,1276 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>무한의 계단 - Infinite Stairs</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Noto+Sans+KR:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            touch-action: manipulation;
+            user-select: none;
+            -webkit-user-select: none;
+            overflow: hidden;
+            background-color: #0f172a;
+        }
+        .font-title {
+            font-family: 'Black Han Sans', sans-serif;
+        }
+        /* Glassmorphic card styling */
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+        }
+        /* Custom neon button animations */
+        .btn-action {
+            transition: transform 0.05s ease, box-shadow 0.05s ease, filter 0.05s ease;
+        }
+        .btn-action:active {
+            transform: scale(0.92) translateY(2px);
+        }
+        /* Pulse & Glow Keyframes */
+        @keyframes feverGlow {
+            0%, 100% { box-shadow: 0 0 20px #f59e0b, inset 0 0 15px #f59e0b; }
+            50% { box-shadow: 0 0 40px #ef4444, inset 0 0 25px #ef4444; }
+        }
+        .fever-active {
+            animation: feverGlow 0.5s infinite alternate;
+        }
+        /* Auto-restart progress bar animation */
+        @keyframes autoProgress {
+            from { width: 100%; }
+            to { width: 0%; }
+        }
+        .auto-progress-bar {
+            animation: autoProgress 1.5s linear forwards;
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col justify-between items-center text-white relative">
+
+    <!-- Top Stats Bar -->
+    <div class="absolute top-0 left-0 right-0 z-20 p-4 flex flex-col items-center pointer-events-none">
+        <!-- Time/Energy Gauge Bar -->
+        <div class="w-full max-w-md h-5 bg-slate-800/80 rounded-full p-1 border border-slate-600 shadow-lg mb-2 relative overflow-hidden">
+            <div id="gaugeBar" class="h-full bg-gradient-to-r from-amber-500 via-emerald-400 to-cyan-400 rounded-full transition-all duration-75 w-full shadow-inner"></div>
+            <div id="feverBadge" class="hidden absolute inset-0 flex items-center justify-center text-xs font-black tracking-widest text-yellow-300 animate-pulse uppercase">
+                ⚡ FEVER TIME 2X SPEED ⚡
+            </div>
+        </div>
+
+        <!-- Start Input Prompt Banner -->
+        <div id="startPrompt" class="hidden text-amber-300 text-xs sm:text-sm font-bold animate-bounce bg-slate-900/90 px-4 py-1.5 rounded-full border border-amber-500/50 shadow-lg">
+            👇 버튼이나 키보드(Z / X)를 누르면 등반이 시작됩니다!
+        </div>
+
+        <!-- Pop-up Item Booster Buttons -->
+        <div id="boosterContainer" class="flex gap-2 mt-2 pointer-events-auto">
+            <button id="btnElevator" class="hidden btn-action px-3.5 py-1.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 border-2 border-indigo-300 rounded-2xl font-title text-xs sm:text-sm text-white shadow-[0_0_15px_rgba(99,102,241,0.6)] flex items-center gap-1.5 animate-bounce cursor-pointer hover:scale-105 active:scale-95">
+                <span class="text-base sm:text-lg">🛗</span>
+                <span>엘리베이터 타고 이동! (+20)</span>
+            </button>
+            <button id="btnRocket" class="hidden btn-action px-3.5 py-1.5 bg-gradient-to-r from-rose-500 via-amber-500 to-yellow-400 border-2 border-amber-300 rounded-2xl font-title text-xs sm:text-sm text-slate-950 shadow-[0_0_15px_rgba(245,158,11,0.7)] flex items-center gap-1.5 animate-bounce cursor-pointer hover:scale-105 active:scale-95">
+                <span class="text-base sm:text-lg">🚀</span>
+                <span>로켓 솟구치기! (+35)</span>
+            </button>
+        </div>
+
+        <!-- Score & Combo Header -->
+        <div class="flex justify-between items-center w-full max-w-md px-2 mt-1">
+            <div class="flex flex-col">
+                <span class="text-xs text-slate-400 font-bold uppercase tracking-wider">Score</span>
+                <span id="currentScore" class="text-4xl font-title text-amber-300 drop-shadow-[0_2px_8px_rgba(245,158,11,0.5)]">0</span>
+            </div>
+            
+            <!-- Combo Display -->
+            <div id="comboContainer" class="flex flex-col items-end opacity-0 transition-opacity duration-200">
+                <span class="text-xs text-rose-400 font-bold uppercase tracking-wider">Combo</span>
+                <span id="comboText" class="text-3xl font-title text-rose-400 drop-shadow-[0_0_10px_rgba(244,63,94,0.6)]">0</span>
+            </div>
+
+            <div class="flex flex-col items-end">
+                <span class="text-xs text-slate-400 font-bold uppercase tracking-wider">Best</span>
+                <span id="topScore" class="text-2xl font-title text-slate-200">0</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Canvas -->
+    <div class="relative w-full h-full flex justify-center items-center overflow-hidden">
+        <canvas id="gameCanvas" class="w-full h-full max-w-2xl"></canvas>
+    </div>
+
+    <!-- On-screen Mobile Controls -->
+    <div class="absolute bottom-4 left-0 right-0 z-20 px-4 flex justify-center items-center gap-4 max-w-md mx-auto pointer-events-auto">
+        <!-- Turn Button (방향전환) -->
+        <button id="btnTurn" class="btn-action flex-1 h-24 sm:h-28 rounded-2xl bg-gradient-to-b from-amber-400 to-orange-600 border-b-4 border-orange-800 shadow-[0_8px_20px_rgba(245,158,11,0.4)] flex flex-col justify-center items-center text-white active:bg-orange-600 select-none cursor-pointer">
+            <span class="text-2xl sm:text-3xl font-title tracking-wider drop-shadow">방향 전환</span>
+            <span class="text-xs opacity-80 mt-1 font-semibold">[ Z / ← 방향키 ]</span>
+        </button>
+
+        <!-- Climb Button (오르기) -->
+        <button id="btnClimb" class="btn-action flex-1 h-24 sm:h-28 rounded-2xl bg-gradient-to-b from-cyan-400 to-blue-600 border-b-4 border-blue-800 shadow-[0_8px_20px_rgba(6,182,212,0.4)] flex flex-col justify-center items-center text-white active:bg-blue-600 select-none cursor-pointer">
+            <span class="text-2xl sm:text-3xl font-title tracking-wider drop-shadow">오르기</span>
+            <span class="text-xs opacity-80 mt-1 font-semibold">[ X / → 방향키 / Space ]</span>
+        </button>
+    </div>
+
+    <!-- Start / Character Selection Overlay Modal -->
+    <div id="startOverlay" class="absolute inset-0 z-30 flex items-center justify-center p-4 glass-panel bg-slate-950/80">
+        <div class="max-w-md w-full bg-slate-900 border border-slate-700 rounded-3xl p-6 shadow-2xl flex flex-col items-center text-center">
+            <h1 class="text-5xl font-title text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-rose-400 to-cyan-400 mb-1 drop-shadow-lg">
+                무한의 계단
+            </h1>
+            <p class="text-slate-400 text-xs font-semibold mb-6">INFINITE STAIRS ACCELERATOR</p>
+
+            <!-- Character Selection -->
+            <div class="w-full mb-6">
+                <span class="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-3">캐릭터 선택</span>
+                <div class="grid grid-cols-4 gap-2" id="characterList">
+                    <!-- Dynamic Character Buttons Inserted by JS -->
+                </div>
+            </div>
+
+            <!-- How to Play Guide -->
+            <div class="w-full bg-slate-800/60 border border-slate-700/60 rounded-2xl p-4 mb-6 text-left text-xs text-slate-300 leading-relaxed">
+                <div class="font-bold text-amber-400 mb-1 flex items-center gap-1">
+                    🎮 조작 방법
+                </div>
+                <ul class="list-disc list-inside space-y-1">
+                    <li><strong class="text-cyan-300">오르기</strong>: 직진하며 다음 계단을 올라갑니다.</li>
+                    <li><strong class="text-amber-300">방향 전환</strong>: 방향을 반대로 바꾼 뒤 올라갑니다.</li>
+                    <li>실수하거나 게이지가 다 달면 계단 아래로 떨어집니다!</li>
+                </ul>
+            </div>
+
+            <!-- Start Button -->
+            <button id="btnStart" class="w-full py-4 rounded-2xl font-title text-2xl bg-gradient-to-r from-emerald-400 to-teal-600 hover:from-emerald-300 hover:to-teal-500 text-slate-950 shadow-[0_0_25px_rgba(52,211,153,0.5)] transition-all transform hover:scale-[1.02] active:scale-95 cursor-pointer">
+                게임 시작 !
+            </button>
+        </div>
+    </div>
+
+    <!-- Game Over Overlay Modal (자동 다시시작 기능 포함) -->
+    <div id="gameOverOverlay" class="hidden absolute inset-0 z-30 flex items-center justify-center p-4 glass-panel bg-slate-950/85">
+        <div class="max-w-md w-full bg-slate-900 border border-rose-900/50 rounded-3xl p-6 shadow-2xl flex flex-col items-center text-center animate-bounce-short">
+            <span class="text-xs font-bold text-rose-500 uppercase tracking-widest mb-1">Game Over</span>
+            <h2 id="gameOverTitle" class="text-4xl font-title text-rose-400 mb-4">으악! 떨어졌다!</h2>
+
+            <div class="w-full bg-slate-800/80 border border-slate-700 rounded-2xl p-5 mb-4 flex flex-col gap-3">
+                <div class="flex justify-between items-center">
+                    <span class="text-slate-400 text-sm font-bold">최종 점수</span>
+                    <span id="finalScore" class="text-3xl font-title text-amber-300">0</span>
+                </div>
+                <div class="h-px bg-slate-700/60 w-full"></div>
+                <div class="flex justify-between items-center">
+                    <span class="text-slate-400 text-sm font-bold">최대 콤보</span>
+                    <span id="maxComboText" class="text-xl font-title text-rose-400">0</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-slate-400 text-sm font-bold">최고 기록</span>
+                    <span id="finalBestScore" class="text-xl font-title text-slate-200">0</span>
+                </div>
+            </div>
+
+            <!-- Auto Restart Timer Bar -->
+            <div class="w-full bg-slate-800 rounded-full h-3 mb-4 overflow-hidden relative border border-slate-700">
+                <div id="autoRestartProgressBar" class="h-full bg-amber-400 rounded-full"></div>
+            </div>
+
+            <p class="text-xs text-amber-300/80 mb-4 font-semibold">잠시 후 자동으로 다시 시작됩니다... (화면 터치 시 즉시 재시작)</p>
+
+            <button id="btnRestart" class="w-full py-3.5 rounded-2xl font-title text-xl bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-300 hover:to-orange-400 text-slate-950 shadow-[0_0_25px_rgba(245,158,11,0.5)] transition-all transform hover:scale-[1.02] active:scale-95 cursor-pointer">
+                지금 바로 재시작 🔄
+            </button>
+        </div>
+    </div>
+
+    <script>
+        /* Retro Web Audio Sound Synthesizer */
+        class SoundEngine {
+            constructor() {
+                this.ctx = null;
+                this.muted = false;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                    if (AudioCtx) this.ctx = new AudioCtx();
+                }
+                if (this.ctx && this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            }
+
+            playStep() {
+                if (!this.ctx || this.muted) return;
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(320, this.ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(120, this.ctx.currentTime + 0.06);
+                    
+                    gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.06);
+                    
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + 0.06);
+                } catch(e){}
+            }
+
+            playTurn() {
+                if (!this.ctx || this.muted) return;
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(450, this.ctx.currentTime);
+                    osc.frequency.linearRampToValueAtTime(750, this.ctx.currentTime + 0.08);
+                    
+                    gain.gain.setValueAtTime(0.25, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.08);
+                    
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + 0.08);
+                } catch(e){}
+            }
+
+            playFever() {
+                if (!this.ctx || this.muted) return;
+                try {
+                    const notes = [523.25, 659.25, 783.99, 1046.50];
+                    notes.forEach((freq, i) => {
+                        const osc = this.ctx.createOscillator();
+                        const gain = this.ctx.createGain();
+                        osc.type = 'square';
+                        osc.frequency.setValueAtTime(freq, this.ctx.currentTime + i * 0.04);
+                        
+                        gain.gain.setValueAtTime(0.12, this.ctx.currentTime + i * 0.04);
+                        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + i * 0.04 + 0.1);
+                        
+                        osc.connect(gain);
+                        gain.connect(this.ctx.destination);
+                        osc.start(this.ctx.currentTime + i * 0.04);
+                        osc.stop(this.ctx.currentTime + i * 0.04 + 0.1);
+                    });
+                } catch(e){}
+            }
+
+            playFail() {
+                if (!this.ctx || this.muted) return;
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(320, this.ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(50, this.ctx.currentTime + 0.45);
+                    
+                    gain.gain.setValueAtTime(0.35, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.45);
+                    
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + 0.45);
+                } catch(e){}
+            }
+
+            playElevator() {
+                if (!this.ctx || this.muted) return;
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(400, this.ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(880, this.ctx.currentTime + 0.3);
+                    gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.3);
+                    osc.connect(gain); gain.connect(this.ctx.destination);
+                    osc.start(); osc.stop(this.ctx.currentTime + 0.3);
+                } catch(e){}
+            }
+
+            playRocket() {
+                if (!this.ctx || this.muted) return;
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(150, this.ctx.currentTime);
+                    osc.frequency.linearRampToValueAtTime(600, this.ctx.currentTime + 0.5);
+                    gain.gain.setValueAtTime(0.35, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.5);
+                    osc.connect(gain); gain.connect(this.ctx.destination);
+                    osc.start(); osc.stop(this.ctx.currentTime + 0.5);
+                } catch(e){}
+            }
+        }
+
+        const sound = new SoundEngine();
+    </script>
+
+    <script>
+        // Character Definitions
+        const CHARACTERS = [
+            { id: 'worker', name: '샐러리맨', color: '#3b82f6', skinColor: '#fde047', icon: '💼', hairColor: '#1e293b' },
+            { id: 'cat', name: '야옹이', color: '#f97316', skinColor: '#ffedd5', icon: '🐱', hairColor: '#ea580c' },
+            { id: 'robot', name: '사이보그', color: '#06b6d4', skinColor: '#cbd5e1', icon: '🤖', hairColor: '#0284c7' },
+            { id: 'hero', name: '슈퍼히어로', color: '#ef4444', skinColor: '#fef08a', icon: '🦸', hairColor: '#dc2626' }
+        ];
+
+        // Background Theme Palettes
+        const THEMES = [
+            { bgTop: '#0f172a', bgBottom: '#1e1b4b', stairColor: '#475569', stairTop: '#64748b' }, // Night City
+            { bgTop: '#311042', bgBottom: '#701a75', stairColor: '#86198f', stairTop: '#a21caf' }, // Neon Cyber
+            { bgTop: '#022c22', bgBottom: '#064e3b', stairColor: '#047857', stairTop: '#10b981' }, // Emerald Sky
+            { bgTop: '#451a03', bgBottom: '#78350f', stairColor: '#b45309', stairTop: '#f59e0b' }  // Sunset Gold
+        ];
+
+        // Canvas & Game Variables
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Layout Constants
+        const STAIR_WIDTH = 64;
+        const STAIR_HEIGHT = 28;
+        const STAIR_DEPTH = 12;
+
+        // Game State: 'START', 'PLAYING', 'FALLING', 'GAMEOVER'
+        let gameState = 'START'; 
+        let score = 0;
+        let combo = 0;
+        let maxCombo = 0;
+        let bestScore = parseInt(localStorage.getItem('inf_stairs_best') || '0', 10);
+        
+        let gauge = 100;
+        let gaugeDepletionRate = 0.22;
+        let hasStartedClimbing = false; // Flag to wait for first button press
+
+        // Booster Item State
+        let isBoosting = false;
+        let nextElevatorStep = 25;
+        let nextRocketStep = 60;
+        let elevatorAvailable = false;
+        let rocketAvailable = false;
+        
+        let selectedChar = CHARACTERS[0];
+        let currentTheme = THEMES[0];
+
+        // Camera Smooth Position
+        let cameraX = 0;
+        let cameraY = 0;
+        let targetCameraX = 0;
+        let targetCameraY = 0;
+
+        // Stairs Queue
+        let stairs = [];
+        let playerStep = 0;
+        let playerFacing = 1; // 1: Right, -1: Left
+        
+        // Character Visual State & Fall Motion Physics
+        let playerAnimOffset = { x: 0, y: 0 };
+        let legState = 0;
+        let fallVx = 0;
+        let fallVy = 0;
+        let fallRotation = 0;
+        let fallRotSpeed = 0;
+        let fallTimer = 0;
+        let gameOverReason = "";
+
+        // Auto Restart Timer
+        let autoRestartTimeout = null;
+
+        // Particles System
+        let particles = [];
+        let floatingTexts = [];
+
+        // Fever System
+        let feverMode = false;
+        let feverTimer = 0;
+
+        // Initialize Character Selection Buttons
+        function initCharacterUI() {
+            const container = document.getElementById('characterList');
+            container.innerHTML = '';
+            
+            CHARACTERS.forEach(char => {
+                const btn = document.createElement('button');
+                const isSelected = char.id === selectedChar.id;
+                btn.className = `p-3 rounded-2xl flex flex-col items-center justify-center transition-all cursor-pointer border ${
+                    isSelected ? 'bg-slate-700 border-amber-400 scale-105 shadow-[0_0_15px_rgba(245,158,11,0.3)]' : 'bg-slate-800/80 border-slate-700 opacity-70 hover:opacity-100'
+                }`;
+                btn.innerHTML = `
+                    <span class="text-2xl mb-1">${char.icon}</span>
+                    <span class="text-[10px] font-bold text-slate-200">${char.name}</span>
+                `;
+                btn.onclick = () => {
+                    selectedChar = char;
+                    initCharacterUI();
+                };
+                container.appendChild(btn);
+            });
+            
+            document.getElementById('topScore').innerText = bestScore;
+        }
+
+        // Initialize Game Session
+        function resetGame() {
+            if (autoRestartTimeout) {
+                clearTimeout(autoRestartTimeout);
+                autoRestartTimeout = null;
+            }
+
+            score = 0;
+            combo = 0;
+            maxCombo = 0;
+            gauge = 100;
+            gaugeDepletionRate = 0.22;
+            hasStartedClimbing = false;
+            feverMode = false;
+            feverTimer = 0;
+            
+            isBoosting = false;
+            elevatorAvailable = false;
+            rocketAvailable = false;
+            nextElevatorStep = 25;
+            nextRocketStep = 60;
+            hideBoosterButtons();
+
+            playerStep = 0;
+            playerFacing = 1;
+            playerAnimOffset = { x: 0, y: 0 };
+            fallVx = 0;
+            fallVy = 0;
+            fallRotation = 0;
+            fallRotSpeed = 0;
+            fallTimer = 0;
+
+            stairs = [];
+            particles = [];
+            floatingTexts = [];
+
+            stairs.push({ x: 0, y: 0 });
+
+            let currentX = 0;
+            let currentDir = 1;
+            let consecutiveSameDir = 0;
+
+            // Generate initial batch of clean stairs
+            for (let i = 1; i < 500; i++) {
+                if (consecutiveSameDir >= 4 || (Math.random() < 0.45 && consecutiveSameDir > 1)) {
+                    currentDir = -currentDir;
+                    consecutiveSameDir = 1;
+                } else {
+                    consecutiveSameDir++;
+                }
+
+                currentX += currentDir;
+
+                stairs.push({
+                    x: currentX,
+                    y: i,
+                    dir: currentDir
+                });
+            }
+
+            const startStair = stairs[0];
+            cameraX = startStair.x * STAIR_WIDTH;
+            cameraY = -startStair.y * STAIR_HEIGHT;
+            targetCameraX = cameraX;
+            targetCameraY = cameraY;
+
+            document.getElementById('startPrompt').classList.remove('hidden');
+            updateScoreUI();
+        }
+
+        // Add more stairs as player climbs
+        function ensureStairsAhead() {
+            if (stairs.length - playerStep < 50) {
+                let lastStair = stairs[stairs.length - 1];
+                let currentX = lastStair.x;
+                let currentDir = lastStair.dir || 1;
+                let consecutiveSameDir = 2;
+
+                for (let i = 0; i < 100; i++) {
+                    const nextY = lastStair.y + 1 + i;
+                    if (consecutiveSameDir >= 4 || (Math.random() < 0.45 && consecutiveSameDir > 1)) {
+                        currentDir = -currentDir;
+                        consecutiveSameDir = 1;
+                    } else {
+                        consecutiveSameDir++;
+                    }
+                    currentX += currentDir;
+                    stairs.push({
+                        x: currentX,
+                        y: nextY,
+                        dir: currentDir
+                    });
+                }
+            }
+        }
+
+        // Process Player Action
+        function handlePlayerAction(actionType) {
+            if (gameState !== 'PLAYING' || isBoosting) return;
+
+            // Start gauge timer on first button action
+            if (!hasStartedClimbing) {
+                hasStartedClimbing = true;
+                document.getElementById('startPrompt').classList.add('hidden');
+            }
+
+            const nextStair = stairs[playerStep + 1];
+            if (!nextStair) return;
+
+            const currentStair = stairs[playerStep];
+            const requiredDir = nextStair.x - currentStair.x;
+
+            let isCorrect = false;
+
+            if (actionType === 'STEP') {
+                if (playerFacing === requiredDir) {
+                    isCorrect = true;
+                }
+            } else if (actionType === 'TURN') {
+                const newFacing = -playerFacing;
+                if (newFacing === requiredDir) {
+                    playerFacing = newFacing;
+                    isCorrect = true;
+                }
+            }
+
+            if (isCorrect) {
+                playerStep++;
+                score++;
+                combo++;
+                if (combo > maxCombo) maxCombo = combo;
+
+                if (actionType === 'TURN') sound.playTurn();
+                else sound.playStep();
+
+                const gaugeBonus = feverMode ? 3.5 : Math.max(2.0, 4.0 - (score * 0.003));
+                gauge = Math.min(100, gauge + gaugeBonus);
+
+                const themeIndex = Math.floor((score / 50) % THEMES.length);
+                currentTheme = THEMES[themeIndex];
+
+                if (combo > 0 && combo % 40 === 0 && !feverMode) {
+                    triggerFever();
+                }
+
+                createStepFire(stairs[playerStep], playerFacing, actionType === 'TURN', combo);
+
+                if (score % 10 === 0) {
+                    addFloatingText(`+${score}`, stairs[playerStep].x * STAIR_WIDTH, -stairs[playerStep].y * STAIR_HEIGHT - 40, '#f59e0b');
+                }
+
+                checkBoosterPopups();
+
+                legState = (legState + 1) % 2;
+                playerAnimOffset.y = -8;
+
+                ensureStairsAhead();
+                updateScoreUI();
+            } else {
+                // Direction mistake -> Trigger Fall Motion
+                startFallingMotion("방향 착오!");
+            }
+        }
+
+        function checkBoosterPopups() {
+            if (playerStep >= nextElevatorStep && !elevatorAvailable) {
+                elevatorAvailable = true;
+                document.getElementById('btnElevator').classList.remove('hidden');
+            }
+            if (playerStep >= nextRocketStep && !rocketAvailable) {
+                rocketAvailable = true;
+                document.getElementById('btnRocket').classList.remove('hidden');
+            }
+        }
+
+        function hideBoosterButtons() {
+            document.getElementById('btnElevator').classList.add('hidden');
+            document.getElementById('btnRocket').classList.add('hidden');
+        }
+
+        // Trigger Elevator Booster
+        function executeElevatorBoost() {
+            if (gameState !== 'PLAYING' || isBoosting || !elevatorAvailable) return;
+            
+            isBoosting = true;
+            elevatorAvailable = false;
+            document.getElementById('btnElevator').classList.add('hidden');
+            nextElevatorStep = playerStep + 50 + Math.floor(Math.random() * 20);
+
+            sound.playElevator();
+            gauge = 100;
+
+            const targetSteps = 20;
+            let stepsDone = 0;
+            addFloatingText("🛗 엘리베이터 발동! +20", stairs[playerStep].x * STAIR_WIDTH, -stairs[playerStep].y * STAIR_HEIGHT - 60, '#a855f7');
+
+            const boostInterval = setInterval(() => {
+                if (gameState !== 'PLAYING') {
+                    clearInterval(boostInterval);
+                    isBoosting = false;
+                    return;
+                }
+
+                playerStep++;
+                score++;
+                combo++;
+                if (combo > maxCombo) maxCombo = combo;
+
+                const curStair = stairs[playerStep];
+                if (curStair && stairs[playerStep + 1]) {
+                    playerFacing = stairs[playerStep + 1].x - curStair.x;
+                }
+
+                ensureStairsAhead();
+                updateScoreUI();
+
+                // Sparkle particles
+                if (curStair) {
+                    for (let p = 0; p < 3; p++) {
+                        particles.push({
+                            x: curStair.x * STAIR_WIDTH + (Math.random() - 0.5) * 30,
+                            y: -curStair.y * STAIR_HEIGHT,
+                            vx: (Math.random() - 0.5) * 4,
+                            vy: -Math.random() * 4 - 2,
+                            size: Math.random() * 6 + 3,
+                            color: '#c084fc',
+                            life: 20
+                        });
+                    }
+                }
+
+                stepsDone++;
+                if (stepsDone >= targetSteps) {
+                    clearInterval(boostInterval);
+                    isBoosting = false;
+                }
+            }, 35);
+        }
+
+        // Trigger Rocket Booster
+        function executeRocketBoost() {
+            if (gameState !== 'PLAYING' || isBoosting || !rocketAvailable) return;
+
+            isBoosting = true;
+            rocketAvailable = false;
+            document.getElementById('btnRocket').classList.add('hidden');
+            nextRocketStep = playerStep + 80 + Math.floor(Math.random() * 30);
+
+            sound.playRocket();
+            gauge = 100;
+
+            const targetSteps = 35;
+            let stepsDone = 0;
+            addFloatingText("🚀 로켓 부스터! +35", stairs[playerStep].x * STAIR_WIDTH, -stairs[playerStep].y * STAIR_HEIGHT - 60, '#f59e0b');
+
+            const boostInterval = setInterval(() => {
+                if (gameState !== 'PLAYING') {
+                    clearInterval(boostInterval);
+                    isBoosting = false;
+                    return;
+                }
+
+                playerStep++;
+                score++;
+                combo++;
+                if (combo > maxCombo) maxCombo = combo;
+
+                const curStair = stairs[playerStep];
+                if (curStair && stairs[playerStep + 1]) {
+                    playerFacing = stairs[playerStep + 1].x - curStair.x;
+                }
+
+                ensureStairsAhead();
+                updateScoreUI();
+
+                // Rocket trail fire particles
+                if (curStair) {
+                    for (let p = 0; p < 6; p++) {
+                        particles.push({
+                            x: curStair.x * STAIR_WIDTH + (Math.random() - 0.5) * 20,
+                            y: -curStair.y * STAIR_HEIGHT + 15,
+                            vx: (Math.random() - 0.5) * 8,
+                            vy: Math.random() * 6 + 3,
+                            size: Math.random() * 8 + 4,
+                            color: ['#fef08a', '#f97316', '#ef4444'][Math.floor(Math.random() * 3)],
+                            life: 25
+                        });
+                    }
+                }
+
+                stepsDone++;
+                if (stepsDone >= targetSteps) {
+                    clearInterval(boostInterval);
+                    isBoosting = false;
+                }
+            }, 25);
+        }
+
+        function triggerFever() {
+            feverMode = true;
+            feverTimer = 180;
+            sound.playFever();
+            document.getElementById('feverBadge').classList.remove('hidden');
+            document.getElementById('gaugeBar').parentElement.classList.add('fever-active');
+            
+            const curStair = stairs[playerStep];
+            for (let i = 0; i < 25; i++) {
+                particles.push({
+                    x: curStair.x * STAIR_WIDTH,
+                    y: -curStair.y * STAIR_HEIGHT,
+                    vx: (Math.random() - 0.5) * 12,
+                    vy: (Math.random() - 1) * 10 - 3,
+                    size: Math.random() * 6 + 4,
+                    color: ['#f59e0b', '#ef4444', '#06b6d4', '#10b981', '#ec4899'][Math.floor(Math.random() * 5)],
+                    life: 45
+                });
+            }
+        }
+
+        // Start Legend Falling Physics Motion
+        function startFallingMotion(reason) {
+            if (gameState !== 'PLAYING') return;
+
+            gameState = 'FALLING';
+            gameOverReason = reason;
+            sound.playFail();
+
+            // Physics initial values for dramatic falling
+            fallVx = -playerFacing * (Math.random() * 3 + 4);
+            fallVy = -6;
+            fallRotation = 0;
+            fallRotSpeed = (Math.random() > 0.5 ? 1 : -1) * 0.25;
+            fallTimer = 50;
+
+            // Spawn crash burst particles
+            const curStair = stairs[playerStep];
+            if (curStair) {
+                for (let i = 0; i < 15; i++) {
+                    particles.push({
+                        x: curStair.x * STAIR_WIDTH,
+                        y: -curStair.y * STAIR_HEIGHT,
+                        vx: (Math.random() - 0.5) * 8,
+                        vy: (Math.random() - 0.5) * 8,
+                        size: Math.random() * 5 + 3,
+                        color: '#ef4444',
+                        life: 30
+                    });
+                }
+            }
+        }
+
+        // Finalize Game Over & Start Auto-Restart Countdown
+        function showGameOverUI() {
+            gameState = 'GAMEOVER';
+
+            document.getElementById('gameOverTitle').innerText = gameOverReason;
+            document.getElementById('finalScore').innerText = score;
+            document.getElementById('maxComboText').innerText = `${maxCombo} Combo`;
+
+            if (score > bestScore) {
+                bestScore = score;
+                localStorage.setItem('inf_stairs_best', bestScore);
+            }
+            document.getElementById('finalBestScore').innerText = bestScore;
+            document.getElementById('topScore').innerText = bestScore;
+
+            hideBoosterButtons();
+            document.getElementById('feverBadge').classList.add('hidden');
+            document.getElementById('startPrompt').classList.add('hidden');
+            document.getElementById('gaugeBar').parentElement.classList.remove('fever-active');
+
+            const progressBar = document.getElementById('autoRestartProgressBar');
+            progressBar.classList.remove('auto-progress-bar');
+            void progressBar.offsetWidth;
+            progressBar.classList.add('auto-progress-bar');
+
+            document.getElementById('gameOverOverlay').classList.remove('hidden');
+
+            autoRestartTimeout = setTimeout(() => {
+                if (gameState === 'GAMEOVER') {
+                    restartGame();
+                }
+            }, 1500);
+        }
+
+        function updateScoreUI() {
+            document.getElementById('currentScore').innerText = score;
+            const comboContainer = document.getElementById('comboContainer');
+            if (combo > 2) {
+                comboContainer.style.opacity = '1';
+                document.getElementById('comboText').innerText = combo;
+            } else {
+                comboContainer.style.opacity = '0';
+            }
+        }
+
+        function createStepFire(stair, facing, isTurn, comboCount) {
+            const sx = stair.x * STAIR_WIDTH;
+            const sy = -stair.y * STAIR_HEIGHT;
+            
+            const count = feverMode ? 14 : Math.min(12, 5 + Math.floor(comboCount / 8));
+            const flameColors = ['#ffffff', '#fef08a', '#fbbf24', '#f97316', '#ef4444'];
+
+            for (let i = 0; i < count; i++) {
+                const speedX = -facing * (Math.random() * 5 + 3) + (Math.random() - 0.5) * 4;
+                const speedY = (Math.random() - 0.5) * 4 + 1.5;
+
+                particles.push({
+                    x: sx + (Math.random() - 0.5) * (STAIR_WIDTH * 0.7),
+                    y: sy + 6,
+                    vx: isTurn ? -speedX : speedX,
+                    vy: speedY,
+                    drag: 0.91,
+                    size: Math.random() * 9 + 4,
+                    color: flameColors[Math.floor(Math.random() * flameColors.length)],
+                    life: Math.floor(Math.random() * 14 + 10),
+                    maxLife: 24
+                });
+            }
+
+            const emberCount = feverMode ? 5 : (comboCount > 8 ? 3 : 1);
+            for (let i = 0; i < emberCount; i++) {
+                particles.push({
+                    x: sx + (Math.random() - 0.5) * STAIR_WIDTH,
+                    y: sy + 2,
+                    vx: (Math.random() - 0.5) * 4,
+                    vy: -Math.random() * 4 - 2,
+                    drag: 0.96,
+                    size: Math.random() * 4 + 2,
+                    color: '#fef08a',
+                    life: Math.floor(Math.random() * 20 + 15),
+                    maxLife: 35
+                });
+            }
+        }
+
+        function addFloatingText(text, x, y, color) {
+            floatingTexts.push({
+                text: text,
+                x: x,
+                y: y,
+                vy: -1.5,
+                opacity: 1.0,
+                color: color || '#ffffff'
+            });
+        }
+
+        function resizeCanvas() {
+            const rect = canvas.parentElement.getBoundingClientRect();
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            ctx.scale(dpr, dpr);
+        }
+        window.addEventListener('resize', resizeCanvas);
+
+        function drawBackground(width, height) {
+            const grad = ctx.createLinearGradient(0, 0, 0, height);
+            grad.addColorStop(0, currentTheme.bgTop);
+            grad.addColorStop(1, currentTheme.bgBottom);
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, width, height);
+
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
+            ctx.lineWidth = 1;
+            const gridSize = 40;
+            const offsetX = (cameraX * 0.2) % gridSize;
+            const offsetY = (cameraY * 0.2) % gridSize;
+
+            for (let x = -offsetX; x < width; x += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, height);
+                ctx.stroke();
+            }
+            for (let y = -offsetY; y < height; y += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(width, y);
+                ctx.stroke();
+            }
+        }
+
+        function drawStairs(centerX, centerY) {
+            const visibleRange = 35;
+            const startIdx = Math.max(0, playerStep - 20);
+            const endIdx = Math.min(stairs.length, playerStep + visibleRange);
+
+            for (let i = startIdx; i < endIdx; i++) {
+                const s = stairs[i];
+                const screenX = centerX + (s.x * STAIR_WIDTH) - cameraX;
+                const screenY = centerY + (-s.y * STAIR_HEIGHT) - cameraY;
+
+                const isPassed = i < playerStep;
+                const isCurrent = i === playerStep;
+
+                ctx.fillStyle = isCurrent ? '#fbbf24' : (isPassed ? '#334155' : currentTheme.stairTop);
+                ctx.beginPath();
+                ctx.roundRect(screenX - STAIR_WIDTH / 2, screenY, STAIR_WIDTH, STAIR_HEIGHT / 2, [4, 4, 0, 0]);
+                ctx.fill();
+
+                ctx.fillStyle = isCurrent ? '#d97706' : (isPassed ? '#1e293b' : currentTheme.stairColor);
+                ctx.beginPath();
+                ctx.roundRect(screenX - STAIR_WIDTH / 2, screenY + STAIR_HEIGHT / 2, STAIR_WIDTH, STAIR_DEPTH, [0, 0, 4, 4]);
+                ctx.fill();
+
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(screenX - STAIR_WIDTH / 2 + 2, screenY + 1);
+                ctx.lineTo(screenX + STAIR_WIDTH / 2 - 2, screenY + 1);
+                ctx.stroke();
+
+                if (s.y % 10 === 0 && s.y > 0) {
+                    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+                    ctx.font = 'bold 10px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(s.y, screenX, screenY - 6);
+                }
+            }
+        }
+
+        // Render Player
+        function drawPlayer(centerX, centerY) {
+            const curStair = stairs[playerStep];
+            if (!curStair) return;
+
+            const px = centerX + (curStair.x * STAIR_WIDTH) - cameraX + playerAnimOffset.x;
+            const py = centerY + (-curStair.y * STAIR_HEIGHT) - cameraY + playerAnimOffset.y;
+
+            ctx.save();
+            ctx.translate(px, py - 12);
+
+            // Apply falling rotation when falling
+            if (gameState === 'FALLING') {
+                ctx.rotate(fallRotation);
+            }
+
+            // Flip sprite depending on facing direction
+            ctx.scale(playerFacing, 1);
+
+            // Character Shadow (Hide when falling)
+            if (gameState !== 'FALLING') {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+                ctx.beginPath();
+                ctx.ellipse(0, 10, 16, 6, 0, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // Legs Animation
+            ctx.fillStyle = '#0f172a';
+            if (gameState === 'FALLING') {
+                ctx.fillRect(-10, -4, 5, 12);
+                ctx.fillRect(5, -4, 5, 12);
+            } else if (legState === 0) {
+                ctx.fillRect(-8, -4, 5, 12);
+                ctx.fillRect(3, -4, 5, 10);
+            } else {
+                ctx.fillRect(-8, -4, 5, 10);
+                ctx.fillRect(3, -4, 5, 12);
+            }
+
+            // Character Body
+            ctx.fillStyle = selectedChar.color;
+            ctx.beginPath();
+            ctx.roundRect(-12, -26, 24, 22, 6);
+            ctx.fill();
+
+            // Character Head
+            ctx.fillStyle = selectedChar.skinColor;
+            ctx.beginPath();
+            ctx.arc(0, -34, 11, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Hair / Hat / Accessories
+            ctx.fillStyle = selectedChar.hairColor;
+            ctx.beginPath();
+            ctx.arc(0, -37, 11, Math.PI, Math.PI * 2);
+            ctx.fill();
+
+            // Eye Expression
+            ctx.fillStyle = '#0f172a';
+            if (gameState === 'FALLING') {
+                ctx.strokeStyle = '#0f172a';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(2, -36); ctx.lineTo(6, -32);
+                ctx.moveTo(6, -36); ctx.lineTo(2, -32);
+                ctx.stroke();
+            } else {
+                ctx.beginPath();
+                ctx.arc(4, -34, 2, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // Character Icon Badge
+            ctx.font = '12px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(selectedChar.icon, 0, -14);
+
+            if (gameState === 'PLAYING' && (feverMode || combo > 10)) {
+                ctx.save();
+                const flameHeight = Math.random() * 18 + 12;
+                const grad = ctx.createLinearGradient(0, 6, 0, 6 + flameHeight);
+                grad.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
+                grad.addColorStop(0.3, 'rgba(251, 191, 36, 0.9)');
+                grad.addColorStop(0.7, 'rgba(249, 115, 22, 0.8)');
+                grad.addColorStop(1, 'rgba(239, 68, 68, 0)');
+
+                ctx.fillStyle = grad;
+                ctx.beginPath();
+                ctx.moveTo(-9, 6);
+                ctx.lineTo(9, 6);
+                ctx.lineTo((Math.random() - 0.5) * 8, 6 + flameHeight);
+                ctx.closePath();
+                ctx.fill();
+                ctx.restore();
+            }
+
+            ctx.restore();
+        }
+
+        function drawFX(centerX, centerY) {
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                if (p.drag) {
+                    p.vx *= p.drag;
+                    p.vy *= p.drag;
+                }
+                p.life--;
+
+                const screenX = centerX + p.x - cameraX;
+                const screenY = centerY + p.y - cameraY;
+
+                const maxL = p.maxLife || 20;
+                const progress = Math.max(0, p.life / maxL);
+                const currentSize = p.size * progress;
+
+                ctx.fillStyle = p.color;
+                ctx.globalAlpha = Math.max(0, progress);
+                ctx.beginPath();
+                ctx.arc(screenX, screenY, Math.max(0.2, currentSize), 0, Math.PI * 2);
+                ctx.fill();
+
+                if (p.life <= 0) particles.splice(i, 1);
+            }
+            ctx.restore();
+
+            for (let i = floatingTexts.length - 1; i >= 0; i--) {
+                const ft = floatingTexts[i];
+                ft.y += ft.vy;
+                ft.opacity -= 0.025;
+
+                const screenX = centerX + ft.x - cameraX;
+                const screenY = centerY + ft.y - cameraY;
+
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, ft.opacity);
+                ctx.fillStyle = ft.color;
+                ctx.font = '900 18px "Black Han Sans", sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(ft.text, screenX, screenY);
+                ctx.restore();
+
+                if (ft.opacity <= 0) floatingTexts.splice(i, 1);
+            }
+        }
+
+        // Main Loop
+        function gameLoop() {
+            const width = canvas.width / (window.devicePixelRatio || 1);
+            const height = canvas.height / (window.devicePixelRatio || 1);
+            const centerX = width / 2;
+            const centerY = height / 2 + 100;
+
+            if (gameState === 'PLAYING') {
+                const targetStair = stairs[playerStep];
+                if (targetStair) {
+                    targetCameraX = targetStair.x * STAIR_WIDTH;
+                    targetCameraY = -targetStair.y * STAIR_HEIGHT;
+                }
+
+                cameraX += (targetCameraX - cameraX) * 0.25;
+                cameraY += (targetCameraY - cameraY) * 0.25;
+
+                playerAnimOffset.y *= 0.6;
+
+                // Gauge decreases ONLY after user presses the first button
+                if (hasStartedClimbing) {
+                    if (feverMode) {
+                        feverTimer--;
+
+                        if (Math.random() < 0.7 && targetStair) {
+                            particles.push({
+                                x: targetStair.x * STAIR_WIDTH + (Math.random() - 0.5) * 20,
+                                y: -targetStair.y * STAIR_HEIGHT + 10,
+                                vx: (Math.random() - 0.5) * 5,
+                                vy: Math.random() * 4 + 2,
+                                drag: 0.92,
+                                size: Math.random() * 8 + 4,
+                                color: ['#ffffff', '#fef08a', '#fbbf24', '#f97316'][Math.floor(Math.random() * 4)],
+                                life: 18,
+                                maxLife: 18
+                            });
+                        }
+
+                        if (feverTimer <= 0) {
+                            feverMode = false;
+                            document.getElementById('feverBadge').classList.add('hidden');
+                            document.getElementById('gaugeBar').parentElement.classList.remove('fever-active');
+                        }
+                    } else {
+                        const currentDepletion = gaugeDepletionRate + Math.min(0.65, score * 0.0018);
+                        gauge -= currentDepletion;
+
+                        if (gauge <= 0) {
+                            gauge = 0;
+                            startFallingMotion("시간 초과!");
+                        }
+                    }
+                }
+
+                const gaugeBar = document.getElementById('gaugeBar');
+                gaugeBar.style.width = `${gauge}%`;
+            } else if (gameState === 'FALLING') {
+                // Falling Physics Simulation Loop
+                playerAnimOffset.x += fallVx;
+                playerAnimOffset.y += fallVy;
+                fallVy += 0.8;
+                fallRotation += fallRotSpeed;
+
+                fallTimer--;
+                if (fallTimer <= 0) {
+                    showGameOverUI();
+                }
+            }
+
+            ctx.clearRect(0, 0, width, height);
+            drawBackground(width, height);
+            drawStairs(centerX, centerY);
+            drawPlayer(centerX, centerY);
+            drawFX(centerX, centerY);
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Event Listeners
+        function setupInputHandlers() {
+            const btnTurn = document.getElementById('btnTurn');
+            const btnClimb = document.getElementById('btnClimb');
+            const btnStart = document.getElementById('btnStart');
+            const btnRestart = document.getElementById('btnRestart');
+
+            const btnElevator = document.getElementById('btnElevator');
+            const btnRocket = document.getElementById('btnRocket');
+
+            btnElevator.addEventListener('pointerdown', (e) => {
+                e.preventDefault();
+                executeElevatorBoost();
+            });
+
+            btnRocket.addEventListener('pointerdown', (e) => {
+                e.preventDefault();
+                executeRocketBoost();
+            });
+
+            const onTurn = (e) => {
+                if (e) e.preventDefault();
+                sound.init();
+                if (gameState === 'GAMEOVER') {
+                    restartGame();
+                } else {
+                    handlePlayerAction('TURN');
+                }
+            };
+
+            const onClimb = (e) => {
+                if (e) e.preventDefault();
+                sound.init();
+                if (gameState === 'GAMEOVER') {
+                    restartGame();
+                } else {
+                    handlePlayerAction('STEP');
+                }
+            };
+
+            btnTurn.addEventListener('pointerdown', onTurn);
+            btnClimb.addEventListener('pointerdown', onClimb);
+
+            // Keyboard Controls
+            window.addEventListener('keydown', (e) => {
+                if (e.repeat) return;
+
+                if (gameState === 'PLAYING') {
+                    sound.init();
+                    if (e.key === '1') {
+                        executeElevatorBoost();
+                    } else if (e.key === '2') {
+                        executeRocketBoost();
+                    } else if (e.key === 'ArrowLeft' || e.key === 'z' || e.key === 'Z' || e.key === 'a' || e.key === 'A') {
+                        handlePlayerAction('TURN');
+                    } else if (e.key === 'ArrowRight' || e.key === 'x' || e.key === 'X' || e.key === 's' || e.key === 'S' || e.key === ' ') {
+                        handlePlayerAction('STEP');
+                    }
+                } else if (gameState === 'GAMEOVER') {
+                    restartGame();
+                } else if (gameState === 'START' && (e.key === 'Enter' || e.key === ' ')) {
+                    startGame();
+                }
+            });
+
+            btnStart.onclick = () => startGame();
+            btnRestart.onclick = () => restartGame();
+
+            // Allow touch on Game Over Overlay to instantly skip auto-restart timer
+            document.getElementById('gameOverOverlay').onclick = () => {
+                if (gameState === 'GAMEOVER') restartGame();
+            };
+        }
+
+        function startGame() {
+            sound.init();
+            document.getElementById('startOverlay').classList.add('hidden');
+            resetGame();
+            gameState = 'PLAYING';
+        }
+
+        function restartGame() {
+            sound.init();
+            document.getElementById('gameOverOverlay').classList.add('hidden');
+            resetGame();
+            gameState = 'PLAYING';
+        }
+
+        // Initialize App on Window Load
+        window.onload = () => {
+            initCharacterUI();
+            resizeCanvas();
+            setupInputHandlers();
+            resetGame();
+            requestAnimationFrame(gameLoop);
+        };
+    </script>
+</body>
+</html>
